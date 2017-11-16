@@ -1,53 +1,296 @@
 #include <definitions.h>
 
-#ifdef MONITOR51                         /* Debugging with Monitor-51 needs   */
-char code reserve [3] _at_ 0x23;         /* space for serial interrupt if     */
-#endif                                   /* Stop Exection with Serial Intr.   */
-                                         /* is enabled                        */
-
 /*
  * The main C function.  Program execution starts
  * here after stack initialization.
  */
 void main (void) {
-	char ch;
-	//Setup the serial port for 1200 baud at 16MHz.
-	initUART();
+  SFRPAGE = CONFIG_PAGE;
+  WDTCN = 0xDE;                       // Disable watchdog timer
+  WDTCN = 0xAD;
 
+  OSCILLATOR_Init ();                 // Initialize oscillator
+  PORT_Init ();                       // Initialize crossbar and GPIO
+  UART0_Init ();                      // Initialize UART0
+  DAC0_Init ();                       // Initialize DAC0
+  DAC1_Init ();                       // Initialize DAC1   
+
+  EA = 1;                             //enable global interrupt
+
+  SFRPAGE = UART0_PAGE;
+  
   while (1) {
-		ch = getchar();
-		switch(ch)
-		{
-			case 'p':
-				printHelloWorld();
-				break;
-			case 'l':
-				blinkLED();
-			  break;
-      case 'a':
-			default:
-				printf("Char is %c\r\n", ch);
-		}
+    // If the complete word has been entered via the terminal followed
+    // by carriage return
+    if((TX_Ready == 1) && (UART_Buffer_Size != 0) && (Byte == 0x0A))
+    {
+      TX_Ready = 0;                  // Set the flag to zero
+      TI0 = 1;                       // Set transmit flag to 1
+      //printf("word recieved\n");
+    }
   }
 }
 
-void initUART()
+
+//-----------------------------------------------------------------------------
+// OSCILLATOR_Init
+// This function initializes the system clock to use an external 22.1184MHz
+// crystal.
+//-----------------------------------------------------------------------------
+void OSCILLATOR_Init (void)
 {
-#ifndef MONITOR51
-    SCON  = 0x50;		        /* SCON: mode 1, 8-bit UART, enable rcvr      */
-    TMOD |= 0x20;           /* TMOD: timer 1, mode 2, 8-bit reload        */
-    TH1   = 0xFF;           /* TH1:  reload value for 115200 baud @ 22.184MHz   */
-    TR1   = 1;              /* TR1:  timer 1 run                          */
-    TI    = 1;              /* TI:   set TI to send first char of UART    */
-#endif
+   int i;                              // Software timer
+
+   char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
+
+   SFRPAGE = CONFIG_PAGE;              // Set SFR page
+
+   OSCICN = 0x80;                      // Set internal oscillator to run
+                                       // at its slowest frequency
+
+   CLKSEL = 0x00;                      // Select the internal osc. as
+                                       // the SYSTEMCLOCK source
+
+   // Initialize external crystal oscillator to use 22.1184 MHz crystal
+
+   OSCXCN = 0x67;                      // Enable external crystal osc.
+   for (i=0; i < 256; i++);            // Wait at least 1ms
+
+   while (!(OSCXCN & 0x80));           // Wait for crystal osc to settle
+
+   CLKSEL = 0x01;
+   // Select external crystal as SYSTEMCLOCK source
+
+   SFRPAGE = SFRPAGE_SAVE;             // Restore SFRPAGE
 }
 
-void printHelloWorld()
+//-----------------------------------------------------------------------------
+// PORT_Init
+// Pinout:
+// P0.0   digital   push-pull     UART TX
+// P0.1   digital   open-drain    UART RX
+// P0.5   digital   push-pull     LED
+//-----------------------------------------------------------------------------
+void PORT_Init (void)
 {
-    printf ("Hello World\n");   /* Print "Hello World" */
+  char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
+
+  SFRPAGE = CONFIG_PAGE;              // Set SFR page
+
+  XBR0     = 0x04;                    // Enable UART0
+  XBR1     = 0x00;
+  XBR2     = 0x40;                    // Enable crossbar and weak pull-up
+
+
+  P0MDOUT |= 0x21;                    // Set P0.5(led) and P0.0(TX) pin to push-pull
+//  P1MDOUT |= 0x40;                    // Set P1.6(LED) to push-pull
+
+  SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
 }
 
-void blinkLED()
+//-----------------------------------------------------------------------------
+// UART0_Init   Variable baud rate, Timer 2, 8-N-1
+// Configure UART0 for operation at <BAUDRATE> 8-N-1 using Timer2 as
+// baud rate source.
+//-----------------------------------------------------------------------------
+void UART0_Init (void)
 {
-	P1 ^=0x01;         		    /* Toggle P1.0 each time we print */
+  char SFRPAGE_SAVE;
+
+  SFRPAGE_SAVE = SFRPAGE;             // Preserve SFRPAGE
+//tmr2 init
+  SFRPAGE = TMR2_PAGE;
+
+  TMR2CN = 0x00;                      // Timer in 16-bit auto-reload up timer
+                                      // mode
+  TMR2CF = 0x08;                      // SYSCLK is time base; no output;
+                                      // up count only
+  RCAP2 = - ((long) SYSTEMCLOCK/BAUDRATE/16);
+  TMR2 = RCAP2;
+  TR2= 1;                             // Start Timer2
+//tmr2 init end
+  SFRPAGE = UART0_PAGE;
+
+  SCON0 = 0x50;                       // 8-bit variable baud rate;
+                                      // 9th bit ignored; RX enabled
+                                      // clear all flags
+  SSTA0 = 0x15;                       // Clear all flags; enable baud rate
+                                      // doubler (not relevant for these
+                                      // timers);
+                                      // Use Timer2 as RX and TX baud rate
+                                      // source;
+   ES0 = 1;
+   IP |= 0x10;
+
+   SFRPAGE = SFRPAGE_SAVE;             // Restore SFRPAGE
 }
+
+
+
+//------------------------------------------------------------------------------------
+// Timer3_Init
+//------------------------------------------------------------------------------------
+// Configure Timer3 to auto-reload and generate an interrupt at interval
+// specified by <counts> using SYSCLK/12 as its time base.
+//------------------------------------------------------------------------------------
+void Timer3_Init (int counts)
+{
+  char old_SFRPAGE;
+
+  old_SFRPAGE = SFRPAGE;                 // Save old SFRPAGE
+  SFRPAGE = TMR3_PAGE;                   // Switch to Timer 3 page
+
+  TMR3CN = 0x00;                         // Stop Timer3; Clear TF3;
+                                          // use SYSCLK/12 as timebase
+  RCAP3   = -counts;                     // Init reload values
+  TMR3    = 0xffff;                      // set to reload immediately
+  EIE2   |= 0x01;                        // enable Timer3 interrupts
+  TR3 = 1;                               // start Timer3
+
+  SFRPAGE = old_SFRPAGE;                 // restore SFRPAGE
+}
+
+//-----------------------------------------------------------------------------
+// DAC0_Init
+// Configure DAC0 to update on Timer4 overflows and enable the the VREF buffer.
+//-----------------------------------------------------------------------------
+void DAC0_Init(void)
+{
+   char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
+   SFRPAGE = DAC0_PAGE;
+   DAC0CN = 0x94;                      // Enable DAC0 in left-justified mode
+                                       // managed by Timer4 overflows
+   SFRPAGE = ADC2_PAGE;
+   REF2CN |= 0x03;                     // Enable the internal VREF (2.4v) and
+                                       // the Bias Generator
+   SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
+}
+
+//-----------------------------------------------------------------------------
+// DAC1_Init
+// Configure DAC1 to update on Timer4 overflows and enable the the VREF buffer.
+//-----------------------------------------------------------------------------
+void DAC1_Init(void)
+{
+   char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
+   SFRPAGE = DAC1_PAGE;
+   DAC1CN = 0x94;                      // Enable DAC1 in left-justified mode
+                                       // managed by Timer4 overflows
+   SFRPAGE = ADC2_PAGE;
+   REF2CN |= 0x03;                     // Enable the internal VREF (2.4v) and
+                                       // the Bias Generator
+   SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
+}
+
+//-----------------------------------------------------------------------------
+// Set_DACs
+//-----------------------------------------------------------------------------
+//
+// Return Value : None
+// Parameters   : None
+//
+// Calculates the update values for the two DACs using SINE_TABLE.  The DACs
+// will actually be updated upon the next Timer4 interrupt.  Until that time,
+// the DACs will hold their current value.
+//
+//-----------------------------------------------------------------------------
+
+void Set_DACs(void)
+{
+   char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
+   // Add a DC bias to change the the rails from a bipolar (-32768 to 32767)
+   // to unipolar (0 to 65535)
+   // Note: the XOR with 0x8000 translates the bipolar quantity into 
+   // a unipolar quantity.
+   SFRPAGE = DAC0_PAGE;
+   DAC0 = 0xffff;           // Write to DAC0
+   SFRPAGE = DAC1_PAGE;
+   DAC1 = 0x8888;           // Write to DAC1
+   SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
+}
+
+//------------------------------------------------------------------------------------
+// Interrupt Service Routines
+//------------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------------
+// Timer3_ISR
+//------------------------------------------------------------------------------------
+// This routine changes the state of the LED whenever Timer3 overflows.
+//
+// NOTE: The SFRPAGE register will automatically be switched to the Timer 3 Page
+// When an interrupt occurs.  SFRPAGE will return to its previous setting on exit
+// from this routine.
+//
+void Timer3_ISR (void) interrupt 14
+{
+   TF3 = 0;                               // clear TF3
+   LED = ~LED;                            // change state of LED
+}
+//-----------------------------------------------------------------------------
+// TIMER4_ISR -- Wave Generator
+//-----------------------------------------------------------------------------
+//
+// This ISR is called on Timer4 overflows.  Timer4 is set to auto-reload mode
+// and is used to schedule the DAC output sample rate in this example.
+// Note that the value that is written to DAC1 during this ISR call is
+// actually transferred to DAC1 at the next Timer4 overflow.
+//
+void TIMER4_ISR (void) interrupt 16
+{
+   TF4 = 0;                            // Clear Timer4 overflow flag 
+   Set_DACs();
+}
+
+void UART0_Interrupt (void) interrupt 4
+{
+   SFRPAGE = UART0_PAGE;
+
+   if (RI0 == 1)
+   {
+     // Check if a new word is being entered
+     if( UART_Buffer_Size == 0) {
+        UART_Input_First = 0; }
+
+     RI0 = 0;
+     Byte = SBUF0;   // Read a character from Hyperterminal
+     
+     if (UART_Buffer_Size < UART_BUFFERSIZE)
+     {
+        UART_Buffer[UART_Input_First] = Byte;
+
+        UART_Buffer_Size++;            // Update array's size
+
+        UART_Input_First++;            // Update counter
+     }
+   }
+
+   if (TI0 == 1)           // Check if transmit flag is set
+   {
+      TI0 = 0;
+
+      if (UART_Buffer_Size != 1)        // If buffer not empty
+      {
+         // Check if a new word is being output
+         if ( UART_Buffer_Size == UART_Input_First )  {
+              UART_Output_First = 0;   }
+
+         Byte = UART_Buffer[UART_Output_First];
+
+         if ((Byte >= 0x61) && (Byte <= 0x7A)) { // If upper case letter
+            Byte -= 32; }
+
+         SBUF0 = Byte;                   // Transmit to Hyperterminal
+
+         UART_Output_First++;             // Update counter
+
+         UART_Buffer_Size--;              // Decrease array size
+      }
+      else
+      {
+         UART_Buffer_Size = 0;          // Set the array size to 0
+         TX_Ready = 1;                  // Transmission complete
+      }
+   }
+}
+
