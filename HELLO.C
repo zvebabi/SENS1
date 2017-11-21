@@ -5,6 +5,10 @@
  * here after stack initialization.
  */
 void main (void) {
+  int floatVal; //for reading float values
+  char ledState;
+  int measurement;                   // Measured voltage in mV
+
   SFRPAGE = CONFIG_PAGE;
   WDTCN = 0xDE;                       // Disable watchdog timer
   WDTCN = 0xAD;
@@ -14,20 +18,57 @@ void main (void) {
   UART0_Init ();                      // Initialize UART0
   DAC0_Init ();                       // Initialize DAC0
   DAC1_Init ();                       // Initialize DAC1   
+  TIMER3_Init(SYSTEMCLOCK/SAMPLE_RATE/12);
+  ADC2_Init ();                       // Init ADC
+  
+  SFRPAGE = ADC2_PAGE;
+  AD2EN = 1;                          // Enable ADC
 
   EA = 1;                             //enable global interrupt
 
   SFRPAGE = UART0_PAGE;
-  
   while (1) {
-    // If the complete word has been entered via the terminal followed
-    // by carriage return
-    if((TX_Ready == 1) && (UART_Buffer_Size != 0) && (Byte == 0x0A))
+//    if((TX_Ready == 1) && (UART_BufferOut_Size > 0))
+//    {
+//      TX_Ready = 0;                  // Set the flag to zero
+//      TI0 = 1;                       // Set transmit flag to 1
+//    }
+    if(RX_Ready) //process command
     {
-      TX_Ready = 0;                  // Set the flag to zero
-      TI0 = 1;                       // Set transmit flag to 1
-      //printf("word recieved\n");
-    }
+      if (strncmp(UART_Buffer,"x=t", 3) == 0) // Light UP command
+      {
+          LED = 0;
+          printf("LED%Bd\n", (char)(0));
+      }
+      if (strncmp(UART_Buffer,"x=l", 3) == 0) // Light UP command
+      {
+          LED = 1;
+          printf("LED%Bd\n", (char)(1));
+      }
+      if (strncmp(UART_Buffer,"x=d", 3) == 0) // DAC set command
+      {
+        if(UART_Buffer_Size>3)
+        {
+          sscanf(UART_Buffer, "x=d%d", &floatVal);
+          Set_DACs(floatVal);
+         // UART_BufferOut = "DAC\n";
+        }
+        //else
+        //  UART_BufferOut = "ERR\n";
+       // UART_BufferOut_Size = 4; //START TRANSMISSION AFTER SIZE SETTING
+      }
+      if (strncmp(UART_Buffer,"x=a", 3) == 0) // ADC read command
+      {
+        EA = 0;                          // Disable interrupts
+        measurement =  Result * 2430 / 1023;
+        EA = 1;                          // Re-enable interrupts
+        
+//        UART_BufferOut = bytes;
+ //       UART_BufferOut_Size = 5;
+      }
+      RX_Ready = 0;
+      UART_Buffer_Size = 0;
+    }      
   }
 }
 
@@ -84,7 +125,7 @@ void PORT_Init (void)
 
   P0MDOUT |= 0x21;                    // Set P0.5(led) and P0.0(TX) pin to push-pull
 //  P1MDOUT |= 0x40;                    // Set P1.6(LED) to push-pull
-
+  P1MDIN = 0xFE;                      // P1.0 Analog Input, Open Drain, from dac
   SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
 }
 
@@ -121,64 +162,82 @@ void UART0_Init (void)
                                       // source;
    ES0 = 1;
    IP |= 0x10;
-
+    TI0 = 1;
    SFRPAGE = SFRPAGE_SAVE;             // Restore SFRPAGE
-}
-
-
-
-//------------------------------------------------------------------------------------
-// Timer3_Init
-//------------------------------------------------------------------------------------
-// Configure Timer3 to auto-reload and generate an interrupt at interval
-// specified by <counts> using SYSCLK/12 as its time base.
-//------------------------------------------------------------------------------------
-void Timer3_Init (int counts)
-{
-  char old_SFRPAGE;
-
-  old_SFRPAGE = SFRPAGE;                 // Save old SFRPAGE
-  SFRPAGE = TMR3_PAGE;                   // Switch to Timer 3 page
-
-  TMR3CN = 0x00;                         // Stop Timer3; Clear TF3;
-                                          // use SYSCLK/12 as timebase
-  RCAP3   = -counts;                     // Init reload values
-  TMR3    = 0xffff;                      // set to reload immediately
-  EIE2   |= 0x01;                        // enable Timer3 interrupts
-  TR3 = 1;                               // start Timer3
-
-  SFRPAGE = old_SFRPAGE;                 // restore SFRPAGE
 }
 
 //-----------------------------------------------------------------------------
 // DAC0_Init
-// Configure DAC0 to update on Timer4 overflows and enable the the VREF buffer.
 //-----------------------------------------------------------------------------
 void DAC0_Init(void)
 {
    char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
    SFRPAGE = DAC0_PAGE;
-   DAC0CN = 0x94;                      // Enable DAC0 in left-justified mode
-                                       // managed by Timer4 overflows
+   DAC0CN = 0x80;                      // Enable DAC0 in right-justified mode
+                                       // managed by on-demand while write to DAC0H
    SFRPAGE = ADC2_PAGE;
-   REF2CN |= 0x03;                     // Enable the internal VREF (2.4v) and
-                                       // the Bias Generator
+   REF2CN |= 0x0F;                     // Enable the external AV+(3.0v) and
+                                       // the Bias Generator, Tempsensor
    SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
 }
 
 //-----------------------------------------------------------------------------
 // DAC1_Init
-// Configure DAC1 to update on Timer4 overflows and enable the the VREF buffer.
 //-----------------------------------------------------------------------------
 void DAC1_Init(void)
 {
    char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
    SFRPAGE = DAC1_PAGE;
-   DAC1CN = 0x94;                      // Enable DAC1 in left-justified mode
-                                       // managed by Timer4 overflows
+  
+   DAC1CN = 0x80;                      // Enable DAC1 in right-justified mode
+                                       // managed by on-demand while write to DAC1H
    SFRPAGE = ADC2_PAGE;
-   REF2CN |= 0x03;                     // Enable the internal VREF (2.4v) and
-                                       // the Bias Generator
+   REF2CN |= 0x0F;                     // Enable the internal Vref(2.4v) and
+                                       // the Bias Generator, Tempsensor
+   SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
+}
+
+
+void ADC2_Init (void)
+{
+   char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
+   SFRPAGE = ADC2_PAGE;
+   ADC2CN = 0x04;                      // ADC2 disabled; normal tracking
+                                       // mode; ADC2 conversions are initiated
+                                       // on overflow of Timer3; ADC2 data is
+                                       // right-justified
+   REF2CN |= 0x03;                      // Enable on-chip VREF,
+                                       // and VREF output buffer
+   AMX2CF = 0x00;                      // AIN inputs are single-ended (default)
+   AMX2SL = 0x01;                      // Select AIN2.1 pin as ADC mux input
+   ADC2CF = (SYSTEMCLOCK/SAR_CLK) << 3;     // ADC conversion clock = 2.5MHz
+   EIE2 |= 0x10;                       // enable ADC interrupts
+   SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
+}
+
+//-----------------------------------------------------------------------------
+// TIMER3_Init
+//-----------------------------------------------------------------------------
+//
+// Return Value : None
+// Parameters   :
+//   1)  int counts - calculated Timer overflow rate
+//                    range is postive range of integer: 0 to 32767
+//
+// Configure Timer3 to auto-reload at interval specified by <counts> (no
+// interrupt generated) using SYSCLK as its time base.
+//
+//-----------------------------------------------------------------------------
+void TIMER3_Init (int counts)
+{
+   char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
+   SFRPAGE = TMR3_PAGE;
+   TMR3CN = 0x00;                      // Stop Timer3; Clear TF3;
+   TMR3CF = 0x00;                      // use SYSCLK/12 as timebase
+   RCAP3   = -counts;                  // Init reload values
+   TMR3    = RCAP3;                    // Set to reload immediately
+   EIE2   &= ~0x01;                    // Disable Timer3 interrupts
+   TR3     = 1;                        // start Timer3
    SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
 }
 
@@ -187,60 +246,53 @@ void DAC1_Init(void)
 //-----------------------------------------------------------------------------
 //
 // Return Value : None
-// Parameters   : None
-//
-// Calculates the update values for the two DACs using SINE_TABLE.  The DACs
-// will actually be updated upon the next Timer4 interrupt.  Until that time,
-// the DACs will hold their current value.
-//
+// Parameters   : value - voltage in mV
 //-----------------------------------------------------------------------------
-
-void Set_DACs(void)
+void Set_DACs(int value)
 {
    char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
-   // Add a DC bias to change the the rails from a bipolar (-32768 to 32767)
-   // to unipolar (0 to 65535)
-   // Note: the XOR with 0x8000 translates the bipolar quantity into 
-   // a unipolar quantity.
-   SFRPAGE = DAC0_PAGE;
-   DAC0 = 0xffff;           // Write to DAC0
+   int toDAC;
+   toDAC = value*DAC_KOEFFS; 
+  
    SFRPAGE = DAC1_PAGE;
-   DAC1 = 0x8888;           // Write to DAC1
+   DAC1 = toDAC;           // Write to DAC1
+   SFRPAGE = DAC0_PAGE;
+   DAC0 = toDAC;           // Write to DAC0
    SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
 }
 
 //------------------------------------------------------------------------------------
 // Interrupt Service Routines
 //------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// ADC2_ISR
+//-----------------------------------------------------------------------------
+//
+// Here we take the ADC2 sample, add it to a running total <accumulator>, and
+// decrement our local decimation counter <int_dec>.  When <int_dec> reaches
+// zero, we post the decimated result in the global variable <Result>.
+//
+//-----------------------------------------------------------------------------
+void ADC2_ISR (void) interrupt 18
+{
+   static unsigned int_dec=INT_DEC;    // Integrate/decimate counter
+                                       // we post a new result when
+                                       // int_dec = 0
+   static long accumulator=0L;         // Here's where we integrate the
+                                       // ADC samples
+   AD2INT = 0;                         // Clear ADC conversion complete
+                                       // indicator
+   accumulator += ADC2;                // Read ADC value and add to running
+                                       // total
+   int_dec--;                          // Update decimation counter
+   if (int_dec == 0)                   // If zero, then post result
+   {
+      int_dec = INT_DEC;               // Reset counter
+      Result = accumulator >> 4;
+      accumulator = 0L;                // Reset accumulator
+   }
+}
 
-//------------------------------------------------------------------------------------
-// Timer3_ISR
-//------------------------------------------------------------------------------------
-// This routine changes the state of the LED whenever Timer3 overflows.
-//
-// NOTE: The SFRPAGE register will automatically be switched to the Timer 3 Page
-// When an interrupt occurs.  SFRPAGE will return to its previous setting on exit
-// from this routine.
-//
-void Timer3_ISR (void) interrupt 14
-{
-   TF3 = 0;                               // clear TF3
-   LED = ~LED;                            // change state of LED
-}
-//-----------------------------------------------------------------------------
-// TIMER4_ISR -- Wave Generator
-//-----------------------------------------------------------------------------
-//
-// This ISR is called on Timer4 overflows.  Timer4 is set to auto-reload mode
-// and is used to schedule the DAC output sample rate in this example.
-// Note that the value that is written to DAC1 during this ISR call is
-// actually transferred to DAC1 at the next Timer4 overflow.
-//
-void TIMER4_ISR (void) interrupt 16
-{
-   TF4 = 0;                            // Clear Timer4 overflow flag 
-   Set_DACs();
-}
 
 void UART0_Interrupt (void) interrupt 4
 {
@@ -257,40 +309,41 @@ void UART0_Interrupt (void) interrupt 4
      
      if (UART_Buffer_Size < UART_BUFFERSIZE)
      {
-        UART_Buffer[UART_Input_First] = Byte;
-
-        UART_Buffer_Size++;            // Update array's size
-
-        UART_Input_First++;            // Update counter
+       UART_Buffer[UART_Input_First] = Byte;
+       UART_Buffer_Size++;            // Update array's size
+       UART_Input_First++;            // Update counter
+       if (Byte == '\n')
+       {
+         RX_Ready = 1;
+       }
      }
    }
 
-   if (TI0 == 1)           // Check if transmit flag is set
-   {
-      TI0 = 0;
+//   if (TI0 == 1)           // Check if transmit flag is set
+//   {
+//      TI0 = 0;
 
-      if (UART_Buffer_Size != 1)        // If buffer not empty
-      {
-         // Check if a new word is being output
-         if ( UART_Buffer_Size == UART_Input_First )  {
-              UART_Output_First = 0;   }
+//      if (UART_BufferOut_Size > 0)        // If buffer not empty
+//      {
+//         // Check if a new word is being output
+//         //if ( UART_BufferOut_Size == UART_Output_First )  {
+//           //   UART_Output_First = 0;   }
 
-         Byte = UART_Buffer[UART_Output_First];
+//         Byte = UART_BufferOut[UART_Output_First];
 
-         if ((Byte >= 0x61) && (Byte <= 0x7A)) { // If upper case letter
-            Byte -= 32; }
+//         //if ((Byte >= 0x61) && (Byte <= 0x7A)) { // If upper case letter
+//           // Byte -= 32; }
 
-         SBUF0 = Byte;                   // Transmit to Hyperterminal
-
-         UART_Output_First++;             // Update counter
-
-         UART_Buffer_Size--;              // Decrease array size
-      }
-      else
-      {
-         UART_Buffer_Size = 0;          // Set the array size to 0
-         TX_Ready = 1;                  // Transmission complete
-      }
-   }
+//         SBUF0 = Byte;                   // Transmit to Hyperterminal
+//         UART_Output_First++;             // Update counter
+//         UART_BufferOut_Size--;              // Decrease array size
+//      }
+//      else
+//      {
+//        UART_BufferOut_Size = 0;          // Set the array size to 0
+//        UART_Output_First = 0;
+//        TX_Ready = 1;                  // Transmission complete
+//      }
+//   }
 }
 
