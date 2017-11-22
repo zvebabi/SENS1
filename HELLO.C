@@ -5,10 +5,11 @@
  * here after stack initialization.
  */
 void main (void) {
-  int floatVal; //for reading float values
-  char ledState;
+  char c;
+  long value; //for reading float values
+  char ledState[5];
   int measurement;                   // Measured voltage in mV
-
+  
   SFRPAGE = CONFIG_PAGE;
   WDTCN = 0xDE;                       // Disable watchdog timer
   WDTCN = 0xAD;
@@ -27,47 +28,76 @@ void main (void) {
   EA = 1;                             //enable global interrupt
 
   SFRPAGE = UART0_PAGE;
+    
   while (1) {
+    
 //    if((TX_Ready == 1) && (UART_BufferOut_Size > 0))
 //    {
 //      TX_Ready = 0;                  // Set the flag to zero
 //      TI0 = 1;                       // Set transmit flag to 1
 //    }
-    if(RX_Ready) //process command
+    
+    if(/*RX_Ready*/RI0==1) //process command
     {
-      if (strncmp(UART_Buffer,"x=t", 3) == 0) // Light UP command
+      if ( scanf("%c=%4s", &c, &ledState) == 2 )
       {
-          LED = 0;
-          printf("LED%Bd\n", (char)(0));
-      }
-      if (strncmp(UART_Buffer,"x=l", 3) == 0) // Light UP command
-      {
-          LED = 1;
-          printf("LED%Bd\n", (char)(1));
-      }
-      if (strncmp(UART_Buffer,"x=d", 3) == 0) // DAC set command
-      {
-        if(UART_Buffer_Size>3)
-        {
-          sscanf(UART_Buffer, "x=d%d", &floatVal);
-          Set_DACs(floatVal);
-         // UART_BufferOut = "DAC\n";
-        }
-        //else
-        //  UART_BufferOut = "ERR\n";
-       // UART_BufferOut_Size = 4; //START TRANSMISSION AFTER SIZE SETTING
-      }
-      if (strncmp(UART_Buffer,"x=a", 3) == 0) // ADC read command
-      {
-        EA = 0;                          // Disable interrupts
-        measurement =  Result * 2430 / 1023;
-        EA = 1;                          // Re-enable interrupts
+        value = (ledState[0]-'0')*1000 + 
+                (ledState[1]-'0')*100 + 
+                (ledState[2]-'0')*10 + 
+                (ledState[3]-'0');
         
-//        UART_BufferOut = bytes;
- //       UART_BufferOut_Size = 5;
+        if (c =='l')
+        {
+          LED = (value == 1111)? 0 : 1;
+        }
+//        printf("c=%cl=%s\n", c, ledState);
+        printf("c=%cl=%ld\n", c, value);
+        while( (c = _getkey()) != '\n' ){;}
       }
-      RX_Ready = 0;
-      UART_Buffer_Size = 0;
+      else
+      {
+        while( (c = _getkey()) != '\n' ){;}
+      }
+      
+//      if (strncmp(UART_Buffer,"x=t", 3) == 0) // Light UP command
+//      {
+//        if(UART_Buffer_Size>3)
+//        {
+//          sscanf(UART_Buffer, "x=t%c", &ledState);
+//          LED = (ledState == '0')? 0 : 1;
+//          printf("LED%c\n", ledState);
+//        }
+////          LED = 0;
+////          printf("LED%Bd\n", (char)(0));
+//      }
+//      if (strncmp(UART_Buffer,"x=l", 3) == 0) // Light UP command
+//      {
+//          LED = 1;
+//          printf("LED%Bd\n", (char)(1));
+//      }
+//      if (strncmp(UART_Buffer,"x=d", 3) == 0) // DAC set command
+//      {
+//        if(UART_Buffer_Size>3)
+//        {
+//          sscanf(UART_Buffer, "x=d%d", &floatVal);
+//          Set_DACs(floatVal);
+//         // UART_BufferOut = "DAC\n";
+//        }
+//        //else
+//        //  UART_BufferOut = "ERR\n";
+//       // UART_BufferOut_Size = 4; //START TRANSMISSION AFTER SIZE SETTING
+//      }
+//      if (strncmp(UART_Buffer,"x=a", 3) == 0) // ADC read command
+//      {
+//        EA = 0;                          // Disable interrupts
+//        measurement =  Result * 2430 / 1023;
+//        EA = 1;                          // Re-enable interrupts
+//        
+////        UART_BufferOut = bytes;
+// //       UART_BufferOut_Size = 5;
+//      }
+//      RX_Ready = 0;
+//      UART_Buffer_Size = 0;
     }      
   }
 }
@@ -294,56 +324,56 @@ void ADC2_ISR (void) interrupt 18
 }
 
 
-void UART0_Interrupt (void) interrupt 4
-{
-   SFRPAGE = UART0_PAGE;
+//void UART0_Interrupt (void) interrupt 4
+//{
+//   SFRPAGE = UART0_PAGE;
 
-   if (RI0 == 1)
-   {
-     // Check if a new word is being entered
-     if( UART_Buffer_Size == 0) {
-        UART_Input_First = 0; }
-
-     RI0 = 0;
-     Byte = SBUF0;   // Read a character from Hyperterminal
-     
-     if (UART_Buffer_Size < UART_BUFFERSIZE)
-     {
-       UART_Buffer[UART_Input_First] = Byte;
-       UART_Buffer_Size++;            // Update array's size
-       UART_Input_First++;            // Update counter
-       if (Byte == '\n')
-       {
-         RX_Ready = 1;
-       }
-     }
-   }
-
-//   if (TI0 == 1)           // Check if transmit flag is set
+//   if (RI0 == 1)
 //   {
-//      TI0 = 0;
+//     // Check if a new word is being entered
+//     if( UART_Buffer_Size == 0) {
+//        UART_Input_First = 0; }
 
-//      if (UART_BufferOut_Size > 0)        // If buffer not empty
-//      {
-//         // Check if a new word is being output
-//         //if ( UART_BufferOut_Size == UART_Output_First )  {
-//           //   UART_Output_First = 0;   }
-
-//         Byte = UART_BufferOut[UART_Output_First];
-
-//         //if ((Byte >= 0x61) && (Byte <= 0x7A)) { // If upper case letter
-//           // Byte -= 32; }
-
-//         SBUF0 = Byte;                   // Transmit to Hyperterminal
-//         UART_Output_First++;             // Update counter
-//         UART_BufferOut_Size--;              // Decrease array size
-//      }
-//      else
-//      {
-//        UART_BufferOut_Size = 0;          // Set the array size to 0
-//        UART_Output_First = 0;
-//        TX_Ready = 1;                  // Transmission complete
-//      }
+//     RI0 = 0;
+//     Byte = SBUF0;   // Read a character from Hyperterminal
+//     
+//     if (UART_Buffer_Size < UART_BUFFERSIZE)
+//     {
+//       UART_Buffer[UART_Input_First] = Byte;
+//       UART_Buffer_Size++;            // Update array's size
+//       UART_Input_First++;            // Update counter
+//       if (Byte == '\n')
+//       {
+//         RX_Ready = 1;
+//       }
+//     }
 //   }
-}
+
+////   if (TI0 == 1)           // Check if transmit flag is set
+////   {
+////      TI0 = 0;
+
+////      if (UART_BufferOut_Size > 0)        // If buffer not empty
+////      {
+////         // Check if a new word is being output
+////         //if ( UART_BufferOut_Size == UART_Output_First )  {
+////           //   UART_Output_First = 0;   }
+
+////         Byte = UART_BufferOut[UART_Output_First];
+
+////         //if ((Byte >= 0x61) && (Byte <= 0x7A)) { // If upper case letter
+////           // Byte -= 32; }
+
+////         SBUF0 = Byte;                   // Transmit to Hyperterminal
+////         UART_Output_First++;             // Update counter
+////         UART_BufferOut_Size--;              // Decrease array size
+////      }
+////      else
+////      {
+////        UART_BufferOut_Size = 0;          // Set the array size to 0
+////        UART_Output_First = 0;
+////        TX_Ready = 1;                  // Transmission complete
+////      }
+////   }
+//}
 

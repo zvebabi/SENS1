@@ -11,7 +11,7 @@
 #define SAR_CLK      2500000           // Desired SAR clock speed
 #define SAMPLE_RATE 100
 #define	BAUDRATE		115200						    // User-definable SW_UART baud rate
-#define UART_BUFFERSIZE 8
+#define UART_BUFFERSIZE 32
 #define INT_DEC      16               // Integrate and decimate ratio
 #define	HW_TIME_COUNT	(SYSCLK/BAUD_RATE/16) // Time count for HW_UART baud rate generation. 
 #define VREF 3000.0                       //mv on AV+
@@ -92,6 +92,7 @@ char _getkey ()
    SFRPAGE = UART0_PAGE;
    while (!RI0);                       // Wait for byte to be received
    c = SBUF0;                          // Read the byte
+   RI0 = 0;
    SFRPAGE = SFRPAGE_SAVE;
    return (c);
 }
