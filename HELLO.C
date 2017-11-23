@@ -30,14 +30,7 @@ void main (void) {
   SFRPAGE = UART0_PAGE;
     
   while (1) {
-    
-//    if((TX_Ready == 1) && (UART_BufferOut_Size > 0))
-//    {
-//      TX_Ready = 0;                  // Set the flag to zero
-//      TI0 = 1;                       // Set transmit flag to 1
-//    }
-    
-    if(/*RX_Ready*/RI0==1) //process command
+    if(RI0==1) //process command
     {
       if ( scanf("%c=%4s", &c, &ledState) == 2 )
       {
@@ -46,58 +39,22 @@ void main (void) {
                 (ledState[2]-'0')*10 + 
                 (ledState[3]-'0');
         
-        if (c =='l')
+        if (c =='l') //LED state
         {
           LED = (value == 1111)? 0 : 1;
+          printf("LED");
         }
-//        printf("c=%cl=%s\n", c, ledState);
-        printf("c=%cl=%ld\n", c, value);
+        if (c == 'd') //DAC set
+        {
+          Set_DACs(value);
+          printf("DAC");
+        }
         while( (c = _getkey()) != '\n' ){;}
       }
       else
       {
         while( (c = _getkey()) != '\n' ){;}
       }
-      
-//      if (strncmp(UART_Buffer,"x=t", 3) == 0) // Light UP command
-//      {
-//        if(UART_Buffer_Size>3)
-//        {
-//          sscanf(UART_Buffer, "x=t%c", &ledState);
-//          LED = (ledState == '0')? 0 : 1;
-//          printf("LED%c\n", ledState);
-//        }
-////          LED = 0;
-////          printf("LED%Bd\n", (char)(0));
-//      }
-//      if (strncmp(UART_Buffer,"x=l", 3) == 0) // Light UP command
-//      {
-//          LED = 1;
-//          printf("LED%Bd\n", (char)(1));
-//      }
-//      if (strncmp(UART_Buffer,"x=d", 3) == 0) // DAC set command
-//      {
-//        if(UART_Buffer_Size>3)
-//        {
-//          sscanf(UART_Buffer, "x=d%d", &floatVal);
-//          Set_DACs(floatVal);
-//         // UART_BufferOut = "DAC\n";
-//        }
-//        //else
-//        //  UART_BufferOut = "ERR\n";
-//       // UART_BufferOut_Size = 4; //START TRANSMISSION AFTER SIZE SETTING
-//      }
-//      if (strncmp(UART_Buffer,"x=a", 3) == 0) // ADC read command
-//      {
-//        EA = 0;                          // Disable interrupts
-//        measurement =  Result * 2430 / 1023;
-//        EA = 1;                          // Re-enable interrupts
-//        
-////        UART_BufferOut = bytes;
-// //       UART_BufferOut_Size = 5;
-//      }
-//      RX_Ready = 0;
-//      UART_Buffer_Size = 0;
     }      
   }
 }
