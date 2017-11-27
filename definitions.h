@@ -8,13 +8,13 @@
 
 //defines here
 #define SYSTEMCLOCK       22118400L       // System clock derived from 22.1184MHz XTL
-#define SAR_CLK      2500000           // Desired SAR clock speed
-#define SAMPLE_RATE 100
+#define SAR_CLK      2500000              // Desired SAR clock speed
+#define STR_RESOLUTION 12000             //10us 10kHz
 #define	BAUDRATE		115200						    // User-definable SW_UART baud rate
 #define UART_BUFFERSIZE 32
-#define INT_DEC      16               // Integrate and decimate ratio
+#define INT_DEC      16                   // Integrate and decimate ratio
 #define	HW_TIME_COUNT	(SYSCLK/BAUD_RATE/16) // Time count for HW_UART baud rate generation. 
-#define VREF 3000.0                       //mv on AV+
+#define VREF 2430.0                       //mv on INTERNAL REF
 #define DAC_RES 4095.0                    //12bit
 #define DAC_KOEFFS = (DAC_RES/VREF)         
 //-----------------------------------------------------------------------------
@@ -36,23 +36,18 @@ sfr16 ADC2     = 0xBE;                 // ADC2 data
 //-----------------------------------------------------------------------------
 
 sbit LED = P0^5;
+sbit STR = P0^7; //str signal output
 
 unsigned char UART_Buffer[UART_BUFFERSIZE];
-//unsigned char* UART_BufferOut;
-unsigned char UART_Buffer_Size = 0;
-unsigned char UART_BufferOut_Size = 0;
-unsigned char UART_Input_First = 0;
-unsigned char UART_Output_First = 0;
-unsigned char TX_Ready = 1;
-unsigned char RX_Ready = 0;
-static char Byte;
 long Result;                           // ADC0 decimated value
-
+unsigned long delayImpulses;
+unsigned long impulseWidth;
+char stateSTR; // 0 - on, 1 - off
 //init func
 void OSCILLATOR_Init (void);
 void PORT_Init (void);
 void UART0_Init (void);
-void TIMER3_Init (int counts);
+void TIMER3_Init (void);
 void DAC0_Init (void);
 void DAC1_Init (void);
 void ADC2_Init (void);
@@ -129,6 +124,28 @@ void Wait_MS(unsigned int ms)
       ms--;                            // Decrement ms
    }
    TR4 = 0;                            // Stop Timer 4
+   SFRPAGE = SFRPAGE_SAVE;             // Restore SFRPAGE
+}
+void Wait_US(unsigned int us)
+{
+   char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
+
+   SFRPAGE = TMR3_PAGE;
+
+   TMR3CN = 0x00;                      // Stop Timer3; Clear TF3;
+   TMR3CF = 0x08;                      // use SYSCLK/12 as timebase
+
+   RCAP3 = -(SYSTEMCLOCK/1000000);   // Timer 3overflows at 1000kHz
+   TMR3 = RCAP3;
+   EIE2   &= ~0x04;                    // Disable Timer4 interrupts
+   TR3 = 1;                            // Start Timer 3
+   while(us)
+   {
+      TF3 = 0;                         // Clear flag to initialize
+      while(!TF3);                     // Wait until timer overflows
+      us--;                            // Decrement ms
+   }
+   TR3 = 0;                            // Stop Timer 3
    SFRPAGE = SFRPAGE_SAVE;             // Restore SFRPAGE
 }
 #endif //DEFINITIONS_H

@@ -6,10 +6,9 @@
  */
 void main (void) {
   char c;
-  long value; //for reading float values
-  char ledState[5];
+  long value; //for reading values
+  char convertBuf[5];
   int measurement;                   // Measured voltage in mV
-  
   SFRPAGE = CONFIG_PAGE;
   WDTCN = 0xDE;                       // Disable watchdog timer
   WDTCN = 0xAD;
@@ -19,35 +18,69 @@ void main (void) {
   UART0_Init ();                      // Initialize UART0
   DAC0_Init ();                       // Initialize DAC0
   DAC1_Init ();                       // Initialize DAC1   
-  TIMER3_Init(SYSTEMCLOCK/SAMPLE_RATE/12);
+  //TIMER3_Init(); //1ms //10us
   ADC2_Init ();                       // Init ADC
   
   SFRPAGE = ADC2_PAGE;
   AD2EN = 1;                          // Enable ADC
-
+  
+  SFRPAGE = CONFIG_PAGE;
   EA = 1;                             //enable global interrupt
 
   SFRPAGE = UART0_PAGE;
-    
+  stateSTR = 0;  
   while (1) {
     if(RI0==1) //process command
     {
-      if ( scanf("%c=%4s", &c, &ledState) == 2 )
+      if ( scanf("%c=%4s", &c, &convertBuf) == 2 )
       {
-        value = (ledState[0]-'0')*1000 + 
-                (ledState[1]-'0')*100 + 
-                (ledState[2]-'0')*10 + 
-                (ledState[3]-'0');
+        value = (convertBuf[0]-'0')*1000 + 
+                (convertBuf[1]-'0')*100 + 
+                (convertBuf[2]-'0')*10 + 
+                (convertBuf[3]-'0');
         
-        if (c =='l') //LED state
+        if (c =='b') //LED state
         {
           LED = (value == 1111)? 0 : 1;
-          printf("LED");
+          printf("LED\n");
         }
         if (c == 'd') //DAC set
         {
           Set_DACs(value);
-          printf("DAC");
+          printf("DAC%d\n", value*DAC_KOEFFS);
+        }
+        if (c == 'a') //red Value from DAC
+        {
+          Wait_MS(500);
+          EA=0;
+          SFRPAGE = ADC2_PAGE;
+          AD2BUSY =1;
+          while (!AD2INT) {;}
+          AD2INT = 0;
+          Result = ADC2;
+          measurement = (Result/1023.0)*2430.0;
+          EA=1;
+          SFRPAGE = UART0_PAGE;
+          printf("ADC%d\n", measurement);
+        }
+        if (c == 'l') //set impulse delay
+        {
+          delayImpulses = value;
+//          printf("set to %d", (int)value);
+        }
+        if (c == 'm') //set impulse width
+        { 
+          if(value < 20)
+            value = 20;
+          impulseWidth = value;
+//          printf("set to %d", (int)value);
+        }
+        if (c == 'n') //start impulse
+        {
+          stateSTR = (value == 1111)? 1 : 0;
+        }
+        else {
+          stateSTR = 0; //always stop impulses
         }
         while( (c = _getkey()) != '\n' ){;}
       }
@@ -55,7 +88,20 @@ void main (void) {
       {
         while( (c = _getkey()) != '\n' ){;}
       }
+    }    
+    //make impulse and send adc data to uart0
+    if(stateSTR == 1) //do impulses
+    {
+      Wait_MS(delayImpulses); 
+      //do pulse
+      printf("Pulse!\n");
+      LED =0;
+      STR = 0;
+      Wait_US(impulseWidth); 
+      STR=1;
+      LED=1;
     }      
+
   }
 }
 
@@ -110,7 +156,7 @@ void PORT_Init (void)
   XBR2     = 0x40;                    // Enable crossbar and weak pull-up
 
 
-  P0MDOUT |= 0x21;                    // Set P0.5(led) and P0.0(TX) pin to push-pull
+  P0MDOUT |= 0xA1;                    // Set P0.7(STR), P0.5(led) and P0.0(TX) pin to push-pull
 //  P1MDOUT |= 0x40;                    // Set P1.6(LED) to push-pull
   P1MDIN = 0xFE;                      // P1.0 Analog Input, Open Drain, from dac
   SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
@@ -189,14 +235,14 @@ void ADC2_Init (void)
 {
    char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
    SFRPAGE = ADC2_PAGE;
-   ADC2CN = 0x04;                      // ADC2 disabled; normal tracking
+   ADC2CN = 0x00;                      // ADC2 disabled; normal tracking
                                        // mode; ADC2 conversions are initiated
-                                       // on overflow of Timer3; ADC2 data is
+                                       // on AD2BUSY; ADC2 data is
                                        // right-justified
    REF2CN |= 0x03;                      // Enable on-chip VREF,
                                        // and VREF output buffer
    AMX2CF = 0x00;                      // AIN inputs are single-ended (default)
-   AMX2SL = 0x01;                      // Select AIN2.1 pin as ADC mux input
+   AMX2SL = 0x00;                      // Select AIN2.1 pin as ADC mux input
    ADC2CF = (SYSTEMCLOCK/SAR_CLK) << 3;     // ADC conversion clock = 2.5MHz
    EIE2 |= 0x10;                       // enable ADC interrupts
    SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
@@ -215,16 +261,16 @@ void ADC2_Init (void)
 // interrupt generated) using SYSCLK as its time base.
 //
 //-----------------------------------------------------------------------------
-void TIMER3_Init (int counts)
+void TIMER3_Init (void)
 {
    char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
    SFRPAGE = TMR3_PAGE;
    TMR3CN = 0x00;                      // Stop Timer3; Clear TF3;
-   TMR3CF = 0x00;                      // use SYSCLK/12 as timebase
-   RCAP3   = -counts;                  // Init reload values
+   TMR3CF = 0x00;//0x08                      // use SYSCLK/12 as timebase
+   RCAP3   = -(SYSTEMCLOCK/1000/12);                  // Init reload values
    TMR3    = RCAP3;                    // Set to reload immediately
-   EIE2   &= ~0x01;                    // Disable Timer3 interrupts
-   TR3     = 1;                        // start Timer3
+   EIE2   |= 0x01;                    // Enable Timer3 interrupts
+   //TR3     = 1;                        // start Timer3
    SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
 }
 
@@ -260,77 +306,68 @@ void Set_DACs(int value)
 // zero, we post the decimated result in the global variable <Result>.
 //
 //-----------------------------------------------------------------------------
-void ADC2_ISR (void) interrupt 18
-{
-   static unsigned int_dec=INT_DEC;    // Integrate/decimate counter
-                                       // we post a new result when
-                                       // int_dec = 0
-   static long accumulator=0L;         // Here's where we integrate the
-                                       // ADC samples
-   AD2INT = 0;                         // Clear ADC conversion complete
-                                       // indicator
-   accumulator += ADC2;                // Read ADC value and add to running
-                                       // total
-   int_dec--;                          // Update decimation counter
-   if (int_dec == 0)                   // If zero, then post result
-   {
-      int_dec = INT_DEC;               // Reset counter
-      Result = accumulator >> 4;
-      accumulator = 0L;                // Reset accumulator
-   }
-}
-
-
-//void UART0_Interrupt (void) interrupt 4
+//void ADC2_ISR (void) interrupt 18
 //{
-//   SFRPAGE = UART0_PAGE;
+//   char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
 
-//   if (RI0 == 1)
+//   static unsigned int_dec=INT_DEC;    // Integrate/decimate counter
+//                                       // we post a new result when
+//                                       // int_dec = 0
+//   static long accumulator=0L;         // Here's where we integrate the
+//                                       // ADC samples
+//     SFRPAGE = ADC2_PAGE;
+
+//   AD2INT = 0;                         // Clear ADC conversion complete
+//                                       // indicator
+//   accumulator += ADC2;                // Read ADC value and add to running
+//                                       // total
+//   int_dec--;                          // Update decimation counter
+//  // ++adc;
+//   if (int_dec == 0)                   // If zero, then post result
 //   {
-//     // Check if a new word is being entered
-//     if( UART_Buffer_Size == 0) {
-//        UART_Input_First = 0; }
+//      int_dec = INT_DEC;               // Reset counter
+//      Result = accumulator >> 4;
+//      accumulator = 0L;                // Reset accumulator
 
-//     RI0 = 0;
-//     Byte = SBUF0;   // Read a character from Hyperterminal
-//     
-//     if (UART_Buffer_Size < UART_BUFFERSIZE)
-//     {
-//       UART_Buffer[UART_Input_First] = Byte;
-//       UART_Buffer_Size++;            // Update array's size
-//       UART_Input_First++;            // Update counter
-//       if (Byte == '\n')
-//       {
-//         RX_Ready = 1;
-//       }
-//     }
 //   }
-
-////   if (TI0 == 1)           // Check if transmit flag is set
-////   {
-////      TI0 = 0;
-
-////      if (UART_BufferOut_Size > 0)        // If buffer not empty
-////      {
-////         // Check if a new word is being output
-////         //if ( UART_BufferOut_Size == UART_Output_First )  {
-////           //   UART_Output_First = 0;   }
-
-////         Byte = UART_BufferOut[UART_Output_First];
-
-////         //if ((Byte >= 0x61) && (Byte <= 0x7A)) { // If upper case letter
-////           // Byte -= 32; }
-
-////         SBUF0 = Byte;                   // Transmit to Hyperterminal
-////         UART_Output_First++;             // Update counter
-////         UART_BufferOut_Size--;              // Decrease array size
-////      }
-////      else
-////      {
-////        UART_BufferOut_Size = 0;          // Set the array size to 0
-////        UART_Output_First = 0;
-////        TX_Ready = 1;                  // Transmission complete
-////      }
-////   }
+//   SFRPAGE = SFRPAGE_SAVE;
 //}
+//void Timer3_ISR (void) interrupt 14
+//{
+//  char SFRPAGE_SAVE = SFRPAGE; 
+//  SFRPAGE = TMR3_PAGE;
+//  TF3 = 0;                          //clear interrupt
+//  if(impulseWidth > 0 )
+//  {
+//      impulseWidth--;                            // Decrement ms
+//  }
+//  else
+//  {
+//    impulseWidth = delayImpulses;
+//    LED = ~LED;
+//  }
 
+//  
+//  if(impulseWidth >= delayImpulses)
+//  {
+//    impulseWidth = 0;               //clear counter
+//    if ( state_tmr3 == 1 )          //after pulse set level to high
+//    {
+//      state_tmr3 = 0;               //next will high level on pin
+//      delayImpulses = 100000;          //1sec if timer resolution is 1 us
+//      LED = 1;                      //set high level on pin
+//    }
+//    else if ( state_tmr3 == 0 )     //after bckgnd set level to low
+//    {
+//      state_tmr3 = 1;               //next will low level on pin
+//      delayImpulses = 50000;           // 0.5 sec if timer resolution is 1 us
+//      LED = 0;                      //set low level on pin
+//    }
+//  }
+//  else
+//  {
+//    impulseWidth++;                 // Increment counter
+//  }
+
+//  SFRPAGE = SFRPAGE_SAVE;
+//}
