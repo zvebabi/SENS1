@@ -14,7 +14,7 @@
 #define UART_BUFFERSIZE 32
 #define INT_DEC      16                   // Integrate and decimate ratio
 #define	HW_TIME_COUNT	(SYSCLK/BAUD_RATE/16) // Time count for HW_UART baud rate generation. 
-#define VREF 2430.0                       //mv on INTERNAL REF
+#define VREF 2500.0                       //mv on INTERNAL REF
 #define DAC_RES 4095.0                    //12bit
 #define DAC_KOEFFS = (DAC_RES/VREF)         
 //-----------------------------------------------------------------------------
@@ -29,6 +29,8 @@ sfr16 RCAP4    = 0xCA;
 sfr16 TMR4     = 0xCC;                 // Timer4 counter
 sfr16 DAC0     = 0xD2;                 // DAC0 data
 sfr16 DAC1     = 0xD2;                 // DAC1 data
+sfr16 ADC0     = 0xBE;                 // ADC0 Data
+sfr16 ADC1     = 0xBE;                 // ADC1 Data
 sfr16 ADC2     = 0xBE;                 // ADC2 data
 
 //-----------------------------------------------------------------------------
@@ -50,6 +52,8 @@ void UART0_Init (void);
 void TIMER3_Init (void);
 void DAC0_Init (void);
 void DAC1_Init (void);
+void ADC0_Init (void);
+void ADC1_Init (void);
 void ADC2_Init (void);
 void Set_DACs(int value);
 	

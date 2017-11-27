@@ -8,7 +8,9 @@ void main (void) {
   char c;
   long value; //for reading values
   char convertBuf[5];
-  int measurement;                   // Measured voltage in mV
+  int measurementDAC;                   // Measured voltage in mV for adc1
+  long measurement;                   // Measured voltage in mV
+  long measurement2;                   // Measured voltage in mV for adc1
   SFRPAGE = CONFIG_PAGE;
   WDTCN = 0xDE;                       // Disable watchdog timer
   WDTCN = 0xAD;
@@ -19,6 +21,8 @@ void main (void) {
   DAC0_Init ();                       // Initialize DAC0
   DAC1_Init ();                       // Initialize DAC1   
   //TIMER3_Init(); //1ms //10us
+  ADC0_Init ();
+  ADC1_Init ();
   ADC2_Init ();                       // Init ADC
   
   SFRPAGE = ADC2_PAGE;
@@ -29,6 +33,8 @@ void main (void) {
 
   SFRPAGE = UART0_PAGE;
   stateSTR = 0;  
+  delayImpulses =1000;
+  impulseWidth = 50;
   while (1) {
     if(RI0==1) //process command
     {
@@ -49,7 +55,7 @@ void main (void) {
           Set_DACs(value);
           printf("DAC%d\n", value*DAC_KOEFFS);
         }
-        if (c == 'a') //red Value from DAC
+        if (c == 'a') //read Value from DAC
         {
           Wait_MS(500);
           EA=0;
@@ -58,10 +64,10 @@ void main (void) {
           while (!AD2INT) {;}
           AD2INT = 0;
           Result = ADC2;
-          measurement = (Result/1023.0)*2430.0;
+          measurementDAC = (Result/1023.0)*2500.0;
           EA=1;
           SFRPAGE = UART0_PAGE;
-          printf("ADC%d\n", measurement);
+          printf("ADC%d\n", measurementDAC);
         }
         if (c == 'l') //set impulse delay
         {
@@ -94,12 +100,42 @@ void main (void) {
     {
       Wait_MS(delayImpulses); 
       //do pulse
-      printf("Pulse!\n");
+      //printf("Pulse!\n");
       LED =0;
       STR = 0;
-      Wait_US(impulseWidth); 
+      //EA=0; //disable interrupts
+      Wait_US(10);
+      
+      //read 16bit ADCs
+      SFRPAGE = ADC0_PAGE;  //
+      AD0BUSY =1;           //start adc 0,1 conversion
+      //while (!AD0INT) {;}
+      AD0INT = 0;
+      Result = ADC0;
+      measurement = (Result);///65536.0)*2500.0;
+      
+      SFRPAGE = ADC1_PAGE;
+      //while (!AD1INT) {;}
+      AD0INT = 0;
+      Result = ADC1;
+      measurement2 = (Result);//65536.0)*2500.0;
+      
+      Wait_US(impulseWidth-10); 
+      
       STR=1;
       LED=1;
+        
+      SFRPAGE = ADC2_PAGE;  //
+      AD2BUSY =1;           //start adc 2  conversion
+      //while (!AD2INT) {;}
+      AD2INT = 0;
+      Result = ADC2;
+      measurementDAC = (Result/1023.0)*2500.0;
+      EA=1; //enable interrupts 
+      SFRPAGE = UART0_PAGE;  
+      printf("ADC0:%d\n", measurement);
+      printf("ADC1:%d\n", measurement2);
+      printf("DAC:%d\n", measurementDAC);
     }      
 
   }
@@ -230,7 +266,31 @@ void DAC1_Init(void)
    SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
 }
 
+void ADC0_Init (void)
+{
+   char SFRPAGE_SAVE = SFRPAGE;
+   int i;
 
+   SFRPAGE = ADC0_PAGE;                // Switch to ADC0 Page
+   ADC0CN = 0x00;                      // ADC Disabled, convertion on AD0BUSY
+   REF0CN = 0x03;                      // turn on bias generator and internal reference.
+   for(i=0;i<10000;i++);               // Wait for Vref to settle (large cap used on target board)
+   AMX0SL = 0x00;                      // Single-ended mode
+   ADC0CF = (SYSTEMCLOCK/SAR_CLK) << 4;    // Select SAR clock frequency =~ 2.5MHz
+   SFRPAGE = SFRPAGE_SAVE;              // restore SFRPAGE
+}
+void ADC1_Init (void)
+{
+   char SFRPAGE_SAVE = SFRPAGE;
+   int i;
+
+   SFRPAGE = ADC1_PAGE;                // Switch to ADC0 Page
+   ADC1CN = 0x02;                      // ADC Disabled, convertion on AD0BUSY
+   REF1CN = 0x03;                      // turn on bias generator and internal reference.
+   for(i=0;i<10000;i++);               // Wait for Vref to settle (large cap used on target board)
+   ADC1CF = (SYSTEMCLOCK/SAR_CLK) << 4;    // Select SAR clock frequency =~ 2.5MHz
+   SFRPAGE = SFRPAGE_SAVE;              // restore SFRPAGE
+}
 void ADC2_Init (void)
 {
    char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
@@ -244,7 +304,7 @@ void ADC2_Init (void)
    AMX2CF = 0x00;                      // AIN inputs are single-ended (default)
    AMX2SL = 0x00;                      // Select AIN2.1 pin as ADC mux input
    ADC2CF = (SYSTEMCLOCK/SAR_CLK) << 3;     // ADC conversion clock = 2.5MHz
-   EIE2 |= 0x10;                       // enable ADC interrupts
+  // EIE2 |= 0x10;                       // enable ADC interrupts
    SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
 }
 
