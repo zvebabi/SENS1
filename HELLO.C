@@ -9,8 +9,9 @@ void main (void) {
   long value; //for reading values
   char convertBuf[5];
   int measurementDAC;                   // Measured voltage in mV for adc1
-  long measurement;                   // Measured voltage in mV
-  long measurement2;                   // Measured voltage in mV for adc1
+  int counter; //conversion counter
+  int measurement[NUM_OF_CONVERSIONS];  // Measured voltage in mV
+  int measurement2[NUM_OF_CONVERSIONS]; // Measured voltage in mV for adc1
   SFRPAGE = CONFIG_PAGE;
   WDTCN = 0xDE;                       // Disable watchdog timer
   WDTCN = 0xAD;
@@ -120,21 +121,24 @@ void main (void) {
       //EA=0; //disable interrupts
       Wait_US(10);
       
-      //read 16bit ADCs
-      SFRPAGE = ADC0_PAGE;  //
-      AD0BUSY =1;           //start adc 0,1 conversion
-      //while (!AD0INT) {;}
-      AD0INT = 0;
-      Result = ADC0;
-      measurement = (Result);///65536.0)*2500.0;
+      for (counter = 0; counter < NUM_OF_CONVERSIONS; counter++)
+      {
+        //read 16bit ADCs
+        SFRPAGE = ADC0_PAGE;  //
+        AD0BUSY =1;           //start adc 0,1 conversion
+        //while (!AD0INT) {;}
+        AD0INT = 0;
+        Result = ADC0;
+        measurement[counter] = (Result);///65536.0)*2500.0;
+        
+        SFRPAGE = ADC1_PAGE;
+        //while (!AD1INT) {;}
+        AD0INT = 0;
+        Result = ADC1;
+        measurement2[counter] = (Result);//65536.0)*2500.0;
+      }
       
-      SFRPAGE = ADC1_PAGE;
-      //while (!AD1INT) {;}
-      AD0INT = 0;
-      Result = ADC1;
-      measurement2 = (Result);//65536.0)*2500.0;
-      
-      Wait_US(impulseWidth-15); 
+      Wait_US(impulseWidth-40); 
       
       STR=1;
       LED=1;
@@ -147,8 +151,11 @@ void main (void) {
       //measurementDAC = (Result/1023.0)*2500.0;
       EA=1; //enable interrupts 
       SFRPAGE = UART0_PAGE;  
-      printf("ADC0:%d\n", measurement);
-      printf("ADC1:%d\n", measurement2);
+      for (counter = 0; counter < NUM_OF_CONVERSIONS; counter++)
+      {
+        printf("ADC0:%d\n", measurement[counter]);
+        printf("ADC1:%d\n", measurement2[counter]);
+      }
       //printf("DAC:%d\n", measurementDAC);
     }      
 

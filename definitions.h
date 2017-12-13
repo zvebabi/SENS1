@@ -17,6 +17,7 @@
 #define VREF 2500.0                       //mv on INTERNAL REF
 #define DAC_RES 4095.0                    //12bit
 #define DAC_KOEFFS = (DAC_RES/VREF)         
+#define NUM_OF_CONVERSIONS 3
 //-----------------------------------------------------------------------------
 // 16-bit SFR Definitions for 'F06x
 //-----------------------------------------------------------------------------
@@ -41,7 +42,7 @@ sbit LED = P0^5;
 sbit STR = P0^7; //str signal output
 
 unsigned char UART_Buffer[UART_BUFFERSIZE];
-long Result;                           // ADC0 decimated value
+int Result;                           // ADC0 decimated value
 unsigned long delayImpulses;
 unsigned long impulseWidth;
 char stateSTR; // 0 - on, 1 - off
