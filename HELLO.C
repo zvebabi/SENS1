@@ -50,6 +50,20 @@ void main (void) {
           LED = (value == 1111)? 0 : 1;
           printf("LED\n");
         }
+        if (c =='r') //change reference
+        {
+          if (value == 1111)
+          {
+            Set_REFs('i');
+            printf("REFInt\n");
+          }
+          else
+          {
+            Set_REFs('e');
+            printf("REFOut\n");
+          }
+          
+        }
         if (c == 'd') //DAC set
         {
           Set_DACs(value);
@@ -120,22 +134,22 @@ void main (void) {
       Result = ADC1;
       measurement2 = (Result);//65536.0)*2500.0;
       
-      Wait_US(impulseWidth-10); 
+      Wait_US(impulseWidth-15); 
       
       STR=1;
       LED=1;
         
-      SFRPAGE = ADC2_PAGE;  //
-      AD2BUSY =1;           //start adc 2  conversion
+      //SFRPAGE = ADC2_PAGE;  //
+      //AD2BUSY =1;           //start adc 2  conversion
       //while (!AD2INT) {;}
-      AD2INT = 0;
-      Result = ADC2;
-      measurementDAC = (Result/1023.0)*2500.0;
+      //AD2INT = 0;
+      //Result = ADC2;
+      //measurementDAC = (Result/1023.0)*2500.0;
       EA=1; //enable interrupts 
       SFRPAGE = UART0_PAGE;  
       printf("ADC0:%d\n", measurement);
       printf("ADC1:%d\n", measurement2);
-      printf("DAC:%d\n", measurementDAC);
+      //printf("DAC:%d\n", measurementDAC);
     }      
 
   }
@@ -354,6 +368,31 @@ void Set_DACs(int value)
    SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
 }
 
+void Set_REFs(char internalRef)
+{
+  char SFRPAGE_SAVE = SFRPAGE;
+
+  if(internalRef == 'i')
+  {
+    
+    SFRPAGE = ADC0_PAGE;
+       REF0CN |= 0x03; 
+    SFRPAGE = ADC1_PAGE;
+       REF1CN |= 0x03; 
+    SFRPAGE = ADC2_PAGE;
+       REF2CN |= 0x03;
+  }
+  else
+  {
+    SFRPAGE = ADC0_PAGE;
+    REF0CN |= 0x02; 
+    SFRPAGE = ADC1_PAGE;
+    REF1CN |= 0x02; 
+    SFRPAGE = ADC2_PAGE;
+    REF2CN |= 0x02;
+  }
+  SFRPAGE = SFRPAGE_SAVE;
+}
 //------------------------------------------------------------------------------------
 // Interrupt Service Routines
 //------------------------------------------------------------------------------------

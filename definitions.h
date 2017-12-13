@@ -56,6 +56,7 @@ void ADC0_Init (void);
 void ADC1_Init (void);
 void ADC2_Init (void);
 void Set_DACs(int value);
+void Set_REFs(char internalRef);
 	
 //-----------------------------------------------------------------------------
 // Support Subroutines
