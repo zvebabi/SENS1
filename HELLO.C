@@ -22,9 +22,9 @@ void main (void) {
   DAC0_Init ();                       // Initialize DAC0
   DAC1_Init ();                       // Initialize DAC1   
   //TIMER3_Init(); //1ms //10us
-  ADC0_Init ();
-  ADC1_Init ();
-  ADC2_Init ();                       // Init ADC
+  ADC0_Init ('i');
+  ADC1_Init ('i');
+  ADC2_Init ('i');                       // Init ADC
   
   SFRPAGE = ADC2_PAGE;
   AD2EN = 1;                          // Enable ADC
@@ -55,12 +55,16 @@ void main (void) {
         {
           if (value == 1111)
           {
-            Set_REFs('i');
+            ADC0_Init ('i');
+            ADC1_Init ('i');
+            ADC2_Init ('i');
             printf("REFInt\n");
           }
           else
           {
-            Set_REFs('e');
+            ADC0_Init ('e');
+            ADC1_Init ('e');
+            ADC2_Init ('e');
             printf("REFOut\n");
           }
           
@@ -138,7 +142,7 @@ void main (void) {
         measurement2[counter] = (Result);//65536.0)*2500.0;
       }
       
-      Wait_US(impulseWidth-40); 
+      Wait_US(impulseWidth-48); 
       
       STR=1;
       LED=1;
@@ -287,46 +291,70 @@ void DAC1_Init(void)
    SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
 }
 
-void ADC0_Init (void)
+void ADC0_Init (char ref)
 {
-   char SFRPAGE_SAVE = SFRPAGE;
-   int i;
-
-   SFRPAGE = ADC0_PAGE;                // Switch to ADC0 Page
-   ADC0CN = 0x00;                      // ADC Disabled, convertion on AD0BUSY
-   REF0CN = 0x03;                      // turn on bias generator and internal reference.
-   for(i=0;i<10000;i++);               // Wait for Vref to settle (large cap used on target board)
-   AMX0SL = 0x00;                      // Single-ended mode
-   ADC0CF = (SYSTEMCLOCK/SAR_CLK) << 4;    // Select SAR clock frequency =~ 2.5MHz
-   SFRPAGE = SFRPAGE_SAVE;              // restore SFRPAGE
+  char SFRPAGE_SAVE = SFRPAGE;
+  int i;
+  
+  SFRPAGE = ADC0_PAGE;                // Switch to ADC0 Page
+  ADC0CN = 0x00;                      // ADC Disabled, convertion on AD0BUSY
+  if(ref == 'i')
+  {
+    REF0CN = 0x03; 
+  }
+  else
+  {
+    REF0CN = 0x02;
+  }
+  //REF0CN = 0x03;                      // turn on bias generator and internal reference.
+  for(i=0;i<10000;i++);               // Wait for Vref to settle (large cap used on target board)
+  AMX0SL = 0x00;                      // Single-ended mode
+  ADC0CF = (SYSTEMCLOCK/SAR_CLK) << 4;    // Select SAR clock frequency =~ 2.5MHz
+  SFRPAGE = SFRPAGE_SAVE;              // restore SFRPAGE
 }
-void ADC1_Init (void)
+void ADC1_Init (char ref)
 {
-   char SFRPAGE_SAVE = SFRPAGE;
-   int i;
+  char SFRPAGE_SAVE = SFRPAGE;
+  int i;
 
-   SFRPAGE = ADC1_PAGE;                // Switch to ADC0 Page
-   ADC1CN = 0x02;                      // ADC Disabled, convertion on AD0BUSY
-   REF1CN = 0x03;                      // turn on bias generator and internal reference.
-   for(i=0;i<10000;i++);               // Wait for Vref to settle (large cap used on target board)
-   ADC1CF = (SYSTEMCLOCK/SAR_CLK) << 4;    // Select SAR clock frequency =~ 2.5MHz
-   SFRPAGE = SFRPAGE_SAVE;              // restore SFRPAGE
+  SFRPAGE = ADC1_PAGE;                // Switch to ADC0 Page
+  ADC1CN = 0x02;                      // ADC Disabled, convertion on AD0BUSY
+  if(ref == 'i')
+  {
+    REF1CN = 0x03; 
+  }
+  else
+  {
+    REF1CN = 0x02;
+  }
+//  REF1CN = 0x03;                      // turn on bias generator and internal reference.
+  for(i=0;i<10000;i++);               // Wait for Vref to settle (large cap used on target board)
+  ADC1CF = (SYSTEMCLOCK/SAR_CLK) << 4;    // Select SAR clock frequency =~ 2.5MHz
+  SFRPAGE = SFRPAGE_SAVE;              // restore SFRPAGE
 }
-void ADC2_Init (void)
+void ADC2_Init (char ref)
 {
-   char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
-   SFRPAGE = ADC2_PAGE;
-   ADC2CN = 0x00;                      // ADC2 disabled; normal tracking
-                                       // mode; ADC2 conversions are initiated
-                                       // on AD2BUSY; ADC2 data is
-                                       // right-justified
-   REF2CN |= 0x03;                      // Enable on-chip VREF,
-                                       // and VREF output buffer
-   AMX2CF = 0x00;                      // AIN inputs are single-ended (default)
-   AMX2SL = 0x00;                      // Select AIN2.1 pin as ADC mux input
-   ADC2CF = (SYSTEMCLOCK/SAR_CLK) << 3;     // ADC conversion clock = 2.5MHz
-  // EIE2 |= 0x10;                       // enable ADC interrupts
-   SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
+  char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
+  SFRPAGE = ADC2_PAGE;
+  ADC2CN = 0x00;                      // ADC2 disabled; normal tracking
+                                      // mode; ADC2 conversions are initiated
+                                      // on AD2BUSY; ADC2 data is
+                                      // right-justified
+  if(ref == 'i')
+  {
+    REF2CN = 0x03; 
+  }
+  else
+  {
+    REF2CN = 0x02;
+  }
+//  REF2CN |= 0x03;                      // Enable on-chip VREF,
+                                      // and VREF output buffer
+  AMX2CF = 0x00;                      // AIN inputs are single-ended (default)
+  AMX2SL = 0x00;                      // Select AIN2.1 pin as ADC mux input
+  ADC2CF = (SYSTEMCLOCK/SAR_CLK) << 3;     // ADC conversion clock = 2.5MHz
+//  EIE2 |= 0x10;                       // enable ADC interrupts
+  SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
 }
 
 //-----------------------------------------------------------------------------
@@ -342,18 +370,18 @@ void ADC2_Init (void)
 // interrupt generated) using SYSCLK as its time base.
 //
 //-----------------------------------------------------------------------------
-void TIMER3_Init (void)
-{
-   char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
-   SFRPAGE = TMR3_PAGE;
-   TMR3CN = 0x00;                      // Stop Timer3; Clear TF3;
-   TMR3CF = 0x00;//0x08                      // use SYSCLK/12 as timebase
-   RCAP3   = -(SYSTEMCLOCK/1000/12);                  // Init reload values
-   TMR3    = RCAP3;                    // Set to reload immediately
-   EIE2   |= 0x01;                    // Enable Timer3 interrupts
-   //TR3     = 1;                        // start Timer3
-   SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
-}
+//void TIMER3_Init (void)
+//{
+//   char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
+//   SFRPAGE = TMR3_PAGE;
+//   TMR3CN = 0x00;                      // Stop Timer3; Clear TF3;
+//   TMR3CF = 0x00;//0x08                      // use SYSCLK/12 as timebase
+//   RCAP3   = -(SYSTEMCLOCK/1000/12);                  // Init reload values
+//   TMR3    = RCAP3;                    // Set to reload immediately
+//   EIE2   |= 0x01;                    // Enable Timer3 interrupts
+//   //TR3     = 1;                        // start Timer3
+//   SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
+//}
 
 //-----------------------------------------------------------------------------
 // Set_DACs
@@ -375,31 +403,6 @@ void Set_DACs(int value)
    SFRPAGE = SFRPAGE_SAVE;             // Restore SFR page
 }
 
-void Set_REFs(char internalRef)
-{
-  char SFRPAGE_SAVE = SFRPAGE;
-
-  if(internalRef == 'i')
-  {
-    
-    SFRPAGE = ADC0_PAGE;
-       REF0CN |= 0x03; 
-    SFRPAGE = ADC1_PAGE;
-       REF1CN |= 0x03; 
-    SFRPAGE = ADC2_PAGE;
-       REF2CN |= 0x03;
-  }
-  else
-  {
-    SFRPAGE = ADC0_PAGE;
-    REF0CN |= 0x02; 
-    SFRPAGE = ADC1_PAGE;
-    REF1CN |= 0x02; 
-    SFRPAGE = ADC2_PAGE;
-    REF2CN |= 0x02;
-  }
-  SFRPAGE = SFRPAGE_SAVE;
-}
 //------------------------------------------------------------------------------------
 // Interrupt Service Routines
 //------------------------------------------------------------------------------------

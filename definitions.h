@@ -17,7 +17,7 @@
 #define VREF 2500.0                       //mv on INTERNAL REF
 #define DAC_RES 4095.0                    //12bit
 #define DAC_KOEFFS = (DAC_RES/VREF)         
-#define NUM_OF_CONVERSIONS 3
+#define NUM_OF_CONVERSIONS 4
 //-----------------------------------------------------------------------------
 // 16-bit SFR Definitions for 'F06x
 //-----------------------------------------------------------------------------
@@ -50,14 +50,13 @@ char stateSTR; // 0 - on, 1 - off
 void OSCILLATOR_Init (void);
 void PORT_Init (void);
 void UART0_Init (void);
-void TIMER3_Init (void);
+//void TIMER3_Init (void);
 void DAC0_Init (void);
 void DAC1_Init (void);
-void ADC0_Init (void);
-void ADC1_Init (void);
-void ADC2_Init (void);
+void ADC0_Init (char ref);
+void ADC1_Init (char ref);
+void ADC2_Init (char ref);
 void Set_DACs(int value);
-void Set_REFs(char internalRef);
 	
 //-----------------------------------------------------------------------------
 // Support Subroutines
