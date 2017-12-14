@@ -10,7 +10,7 @@ void main (void) {
   char convertBuf[5];
   int measurementDAC;                   // Measured voltage in mV for adc1
   int counter; //conversion counter
-  int measurement[NUM_OF_CONVERSIONS];  // Measured voltage in mV
+ // int measurement[NUM_OF_CONVERSIONS];  // Measured voltage in mV
   int measurement2[NUM_OF_CONVERSIONS]; // Measured voltage in mV for adc1
   SFRPAGE = CONFIG_PAGE;
   WDTCN = 0xDE;                       // Disable watchdog timer
@@ -24,7 +24,7 @@ void main (void) {
   //TIMER3_Init(); //1ms //10us
   ADC0_Init (INTERNAL_REF);
   ADC1_Init (INTERNAL_REF);
-  ADC2_Init (INTERNAL_REF);                       // Init ADC
+//  ADC2_Init (INTERNAL_REF);                       // Init ADC
   
   SFRPAGE = ADC2_PAGE;
   AD2EN = 1;                          // Enable ADC
@@ -131,9 +131,9 @@ void main (void) {
         SFRPAGE = ADC0_PAGE;  //
         AD0BUSY =1;           //start adc 0,1 conversion
         //while (!AD0INT) {;}
-        AD0INT = 0;
+        //AD0INT = 0;
 //        Result = ADC0;
-        measurement[counter] = ADC0;///65536.0)*2500.0;
+       // measurement[counter] = ADC0;///65536.0)*2500.0;
         
         SFRPAGE = ADC1_PAGE;
         //while (!AD1INT) {;}
@@ -157,7 +157,7 @@ void main (void) {
       SFRPAGE = UART0_PAGE;  
       for (counter = 0; counter < NUM_OF_CONVERSIONS; counter++)
       {
-        printf("ADC0:%d\n", measurement[counter]);
+  //      printf("ADC0:%d\n", measurement[counter]);
         printf("ADC1:%d\n", measurement2[counter]);
       }
       //printf("DAC:%d\n", measurementDAC);
