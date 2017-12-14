@@ -22,9 +22,9 @@ void main (void) {
   DAC0_Init ();                       // Initialize DAC0
   DAC1_Init ();                       // Initialize DAC1   
   //TIMER3_Init(); //1ms //10us
-  ADC0_Init ('i');
-  ADC1_Init ('i');
-  ADC2_Init ('i');                       // Init ADC
+  ADC0_Init (INTERNAL_REF);
+  ADC1_Init (INTERNAL_REF);
+  ADC2_Init (INTERNAL_REF);                       // Init ADC
   
   SFRPAGE = ADC2_PAGE;
   AD2EN = 1;                          // Enable ADC
@@ -55,16 +55,16 @@ void main (void) {
         {
           if (value == 1111)
           {
-            ADC0_Init ('i');
-            ADC1_Init ('i');
-            ADC2_Init ('i');
+            ADC0_Init (1);
+            ADC1_Init (1);
+            ADC2_Init (1);
             printf("REFInt\n");
           }
           else
           {
-            ADC0_Init ('e');
-            ADC1_Init ('e');
-            ADC2_Init ('e');
+            ADC0_Init (0);
+            ADC1_Init (0);
+            ADC2_Init (0);
             printf("REFOut\n");
           }
           
@@ -132,14 +132,14 @@ void main (void) {
         AD0BUSY =1;           //start adc 0,1 conversion
         //while (!AD0INT) {;}
         AD0INT = 0;
-        Result = ADC0;
-        measurement[counter] = (Result);///65536.0)*2500.0;
+//        Result = ADC0;
+        measurement[counter] = ADC0;///65536.0)*2500.0;
         
         SFRPAGE = ADC1_PAGE;
         //while (!AD1INT) {;}
-        AD0INT = 0;
-        Result = ADC1;
-        measurement2[counter] = (Result);//65536.0)*2500.0;
+        AD1INT = 0;
+//        Result = ADC1;
+        measurement2[counter] = ADC1;//65536.0)*2500.0;
       }
       
       Wait_US(impulseWidth-48); 
@@ -298,7 +298,7 @@ void ADC0_Init (char ref)
   
   SFRPAGE = ADC0_PAGE;                // Switch to ADC0 Page
   ADC0CN = 0x00;                      // ADC Disabled, convertion on AD0BUSY
-  if(ref == 'i')
+  if(ref == 1)
   {
     REF0CN = 0x03; 
   }
@@ -319,7 +319,7 @@ void ADC1_Init (char ref)
 
   SFRPAGE = ADC1_PAGE;                // Switch to ADC0 Page
   ADC1CN = 0x02;                      // ADC Disabled, convertion on AD0BUSY
-  if(ref == 'i')
+  if(ref == 1)
   {
     REF1CN = 0x03; 
   }
@@ -340,7 +340,7 @@ void ADC2_Init (char ref)
                                       // mode; ADC2 conversions are initiated
                                       // on AD2BUSY; ADC2 data is
                                       // right-justified
-  if(ref == 'i')
+  if(ref == 1)
   {
     REF2CN = 0x03; 
   }
