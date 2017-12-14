@@ -161,6 +161,7 @@ void main (void) {
   //      printf("ADC0:%d\n", measurement[counter]);
         printf("ADC1:%d\n", measurement2[counter]);
       }
+      printf("endpulse\n");
       //printf("DAC:%d\n", measurementDAC);
     }      
 
