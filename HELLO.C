@@ -24,7 +24,7 @@ void main (void) {
   //TIMER3_Init(); //1ms //10us
   ADC0_Init (INTERNAL_REF);
   ADC1_Init (INTERNAL_REF);
-//  ADC2_Init (INTERNAL_REF);                       // Init ADC
+  ADC2_Init (INTERNAL_REF);                       // Init ADC
   
   SFRPAGE = ADC2_PAGE;
   AD2EN = 1;                          // Enable ADC
@@ -86,7 +86,8 @@ void main (void) {
           measurementDAC = (Result/1023.0)*2500.0;
           EA=1;
           SFRPAGE = UART0_PAGE;
-          printf("ADC%d\n", measurementDAC);
+          printf("ADC%d mv\n", measurementDAC);
+          printf("ADC%d ticks\n", Result);
         }
         if (c == 'l') //set impulse delay
         {

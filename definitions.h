@@ -18,7 +18,7 @@
 #define DAC_RES 4095.0                    //12bit
 #define DAC_KOEFFS = (DAC_RES/VREF)         
 #define NUM_OF_CONVERSIONS 10
-#define INTERNAL_REF 1 //0-external, 1- internal reference
+#define INTERNAL_REF 0 //0-external, 1- internal reference
 //-----------------------------------------------------------------------------
 // 16-bit SFR Definitions for 'F06x
 //-----------------------------------------------------------------------------
