@@ -14,11 +14,19 @@
 #define UART_BUFFERSIZE 32
 #define INT_DEC      16                   // Integrate and decimate ratio
 #define	HW_TIME_COUNT	(SYSCLK/BAUD_RATE/16) // Time count for HW_UART baud rate generation. 
-#define VREF 2500.0                       //mv on INTERNAL REF
-#define DAC_RES 4095.0                    //12bit
-#define DAC_KOEFFS = (DAC_RES/VREF)         
+        
 #define NUM_OF_CONVERSIONS 8
-#define INTERNAL_REF 1 //0-external, 1- internal reference
+#define INTERNAL_REF 0//0-external, 1- internal reference
+
+#if INTERNAL_REF == 1
+  #define VREF 2500.0                       //mv on INTERNAL REF
+#else
+  #define VREF 3000.0                       //mv on EXTERNAL REF
+#endif
+
+#define DAC_RES 4095.0                    //12bit
+#define ADC_RES 65536.0                    //16bit
+#define DAC_KOEFFS = (DAC_RES/VREF) 
 //-----------------------------------------------------------------------------
 // 16-bit SFR Definitions for 'F06x
 //-----------------------------------------------------------------------------

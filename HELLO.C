@@ -148,7 +148,8 @@ void main (void) {
       for (counter = 0; counter < numOfConversion; counter++)
       {
   //      printf("ADC0:%d\n", measurement[counter]);
-        printf("ADC1:%d\n", measurement2[counter]);
+        printf("ADC1:%dmv\n", measurement2[counter]/65536.0*VREF);
+        printf("ADC1:%dtick\n", measurement2[counter]);
       }
       printf("endpulse\n");
       //printf("DAC:%d\n", measurementDAC);
