@@ -10,6 +10,8 @@ void main (void) {
   char convertBuf[5];
   int measurementDAC;                   // Measured voltage in mV for adc1
   int counter; //conversion counter
+  int numOfConversion;
+  
  // int measurement[NUM_OF_CONVERSIONS];  // Measured voltage in mV
   int measurement2[NUM_OF_CONVERSIONS]; // Measured voltage in mV for adc1
   SFRPAGE = CONFIG_PAGE;
@@ -36,6 +38,7 @@ void main (void) {
   stateSTR = 0;  
   delayImpulses =1000;
   impulseWidth = 50;
+  numOfConversion = NUM_OF_CONVERSIONS;
   while (1) {
     if(RI0==1) //process command
     {
@@ -51,23 +54,10 @@ void main (void) {
           LED = (value == 1111)? 0 : 1;
           printf("LED\n");
         }
-        if (c =='r') //change reference
+        if (c =='r') //change number of conversion
         {
-          if (value == 1111)
-          {
-            ADC0_Init (1);
-            ADC1_Init (1);
-            ADC2_Init (1);
-            printf("REFInt\n");
-          }
-          else
-          {
-            ADC0_Init (0);
-            ADC1_Init (0);
-            ADC2_Init (0);
-            printf("REFOut\n");
-          }
-          
+          numOfConversion = value;
+          printf("NoC%d\n", numOfConversion);
         }
         if (c == 'd') //DAC set
         {
@@ -126,7 +116,7 @@ void main (void) {
       //EA=0; //disable interrupts
       Wait_US(10);
       
-      for (counter = 0; counter < NUM_OF_CONVERSIONS; counter++)
+      for (counter = 0; counter < numOfConversion; counter++)
       {
         //read 16bit ADCs
         SFRPAGE = ADC0_PAGE;  //
@@ -139,11 +129,10 @@ void main (void) {
         SFRPAGE = ADC1_PAGE;
         //while (!AD1INT) {;}
         AD1INT = 0;
-//        Result = ADC1;
-        measurement2[counter] = ADC1;//65536.0)*2500.0;
+        Result = ADC1;
+        measurement2[counter] = Result;//65536.0)*2500.0;
       }
-      
-      Wait_US(impulseWidth-48); 
+      Wait_US(impulseWidth - numOfConversion*5 - 10); 
       
       STR=1;
       LED=1;
@@ -156,7 +145,7 @@ void main (void) {
       //measurementDAC = (Result/1023.0)*2500.0;
       EA=1; //enable interrupts 
       SFRPAGE = UART0_PAGE;  
-      for (counter = 0; counter < NUM_OF_CONVERSIONS; counter++)
+      for (counter = 0; counter < numOfConversion; counter++)
       {
   //      printf("ADC0:%d\n", measurement[counter]);
         printf("ADC1:%d\n", measurement2[counter]);
@@ -320,7 +309,7 @@ void ADC1_Init (char ref)
   int i;
 
   SFRPAGE = ADC1_PAGE;                // Switch to ADC0 Page
-  ADC1CN = 0x02;                      // ADC Disabled, convertion on AD0BUSY
+  ADC1CN = 0x82;                      // ADC Disabled, convertion on AD0BUSY
   if(ref == 1)
   {
     REF1CN = 0x03; 

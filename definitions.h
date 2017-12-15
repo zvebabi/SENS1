@@ -17,7 +17,7 @@
 #define VREF 2500.0                       //mv on INTERNAL REF
 #define DAC_RES 4095.0                    //12bit
 #define DAC_KOEFFS = (DAC_RES/VREF)         
-#define NUM_OF_CONVERSIONS 10
+#define NUM_OF_CONVERSIONS 8
 #define INTERNAL_REF 1 //0-external, 1- internal reference
 //-----------------------------------------------------------------------------
 // 16-bit SFR Definitions for 'F06x
@@ -134,7 +134,10 @@ void Wait_MS(unsigned int ms)
 }
 void Wait_US(unsigned int us)
 {
-   char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
+  char SFRPAGE_SAVE = SFRPAGE;        // Save Current SFR page
+
+  if (us > 200 || us < 0)
+    us = 0;
 
    SFRPAGE = TMR3_PAGE;
 
