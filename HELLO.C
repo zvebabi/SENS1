@@ -111,6 +111,7 @@ void main (void) {
       Wait_MS(delayImpulses); 
       //do pulse
       //printf("Pulse!\n");
+      impulseWidth  = impulseWidth - numOfConversion*5 - 10;
       LED =0;
       STR = 0;
       //EA=0; //disable interrupts
@@ -131,8 +132,9 @@ void main (void) {
         AD1INT = 0;
         Result = ADC1;
         measurement2[counter] = Result;//65536.0)*2500.0;
+//        measurement2[counter] = 17800;//65536.0)*2500.0; //test vals
       }
-      Wait_US(impulseWidth - numOfConversion*5 - 10); 
+      //Wait_US(impulseWidth); 
       
       STR=1;
       LED=1;
@@ -148,8 +150,8 @@ void main (void) {
       for (counter = 0; counter < numOfConversion; counter++)
       {
   //      printf("ADC0:%d\n", measurement[counter]);
-        printf("ADC1:%dmv\n", measurement2[counter]/65536.0*VREF);
-        printf("ADC1:%dtick\n", measurement2[counter]);
+        printf("%.2f,mv,", measurement2[counter] * 0.0458);
+        printf("%d,tick\n", measurement2[counter]);
       }
       printf("endpulse\n");
       //printf("DAC:%d\n", measurementDAC);
