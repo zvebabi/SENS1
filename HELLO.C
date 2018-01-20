@@ -11,6 +11,7 @@ void main (void) {
   int measurementDAC;                   // Measured voltage in mV for adc1
   int counter; //conversion counter
   int numOfConversion;
+  int delay;
   
  // int measurement[NUM_OF_CONVERSIONS];  // Measured voltage in mV
   int measurement2[NUM_OF_CONVERSIONS]; // Measured voltage in mV for adc1
@@ -115,7 +116,7 @@ void main (void) {
       LED =0;
       STR = 0;
       //EA=0; //disable interrupts
-      Wait_US(10);
+      Wait_US(5);
       
       for (counter = 0; counter < numOfConversion; counter++)
       {
@@ -129,6 +130,12 @@ void main (void) {
         
         SFRPAGE = ADC1_PAGE;
         //while (!AD1INT) {;}
+        //Wait_US(1);
+        delay = 0;
+        while(delay < 8)
+        { 
+          delay++;
+        }
         AD1INT = 0;
         Result = ADC1;
         measurement2[counter] = Result;//65536.0)*2500.0;
@@ -150,7 +157,7 @@ void main (void) {
       for (counter = 0; counter < numOfConversion; counter++)
       {
   //      printf("ADC0:%d\n", measurement[counter]);
-        printf("%.2f,mv,", measurement2[counter] * 0.0458);
+        printf("%f,mv,", measurement2[counter] * 0.0458);
         printf("%d,tick\n", measurement2[counter]);
       }
       printf("endpulse\n");
